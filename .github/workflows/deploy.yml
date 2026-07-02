@@ -1,0 +1,53 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # 允許從 Actions 分頁手動觸發
+  workflow_dispatch:
+
+# 授予 GITHUB_TOKEN 部署 Pages 所需權限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一時間只跑一個部署；排隊中的舊任務會被取消
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install --frozen-lockfile
+
+      - run: vp check src
+
+      - name: Build
+        run: vp build
+        env:
+          # 觸發 vite.config.ts 使用 /vpp/ 子路徑
+          GITHUB_PAGES: "true"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
